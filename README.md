@@ -312,11 +312,6 @@ Sanket Notes is one application in the growing Sanket ecosystem:
 * Sanket Scan
 * Sanket PDF Studio
 * Sanket Office
-* Sanket Vault
-* Sanket OCR
-* Sanket Translate
-* Sanket Drive
-* Sanket Sign
 
 Together, these applications aim to create a modern, secure, and privacy-first productivity platform built for users around the world.
 
