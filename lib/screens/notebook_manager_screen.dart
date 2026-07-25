@@ -6,10 +6,10 @@ class NotebookManagerScreen extends StatefulWidget {
   const NotebookManagerScreen({Key? key}) : super(key: key);
 
   @override
-  _NotebookManagerScreenState createState() => _NotebookManagerScreenState();
+  NotebookManagerScreenState createState() => NotebookManagerScreenState();
 }
 
-class _NotebookManagerScreenState extends State<NotebookManagerScreen> {
+class NotebookManagerScreenState extends State<NotebookManagerScreen> {
   final DatabaseService _dbService = DatabaseService();
   List<Notebook> _notebooks = [];
   bool _isLoading = true;
@@ -49,6 +49,7 @@ class _NotebookManagerScreenState extends State<NotebookManagerScreen> {
             onPressed: () async {
               if (controller.text.isNotEmpty) {
                 await _dbService.insertNotebook(Notebook(name: controller.text));
+                if (!mounted) return;
                 Navigator.pop(context);
                 _loadNotebooks();
               }
@@ -80,6 +81,7 @@ class _NotebookManagerScreenState extends State<NotebookManagerScreen> {
             onPressed: () async {
               if (controller.text.isNotEmpty && controller.text != notebook.name) {
                 await _dbService.updateNotebook(Notebook(id: notebook.id, name: controller.text));
+                if (!mounted) return;
                 Navigator.pop(context);
                 _loadNotebooks();
               } else {

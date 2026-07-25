@@ -12,10 +12,10 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  HomeScreenState createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   final DatabaseService _dbService = DatabaseService();
   List<Note> _notes = [];
   List<Notebook> _notebooks = [];
@@ -90,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () async {
               if (controller.text.isNotEmpty) {
                 await _dbService.insertNotebook(Notebook(name: controller.text));
+                if (!mounted) return;
                 Navigator.pop(context);
                 _loadData();
               }
@@ -183,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _selectedNotebookId = null;
                   _selectedTagId = null;
                 });
+                if (!mounted) return;
                 Navigator.pop(context);
                 _loadData();
               },
