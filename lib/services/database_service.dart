@@ -23,12 +23,19 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON;');
       },
       onCreate: _createDb,
+      onUpgrade: _upgradeDb,
     );
+  }
+
+  Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE notes ADD COLUMN plainTextContent TEXT NOT NULL DEFAULT ""');
+    }
   }
 
   Future<void> _createDb(Database db, int version) async {
@@ -44,6 +51,7 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
+        plainTextContent TEXT NOT NULL,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         notebookId INTEGER,
@@ -89,6 +97,38 @@ class DatabaseService {
       whereArgs: [notebookId],
       orderBy: 'updatedAt DESC'
     );
+    return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
+  }
+
+  Future<List<Note>> searchNotes(String query, {int? notebookId, int? tagId}) async {
+    final db = await database;
+    String sql = 'SELECT DISTINCT notes.* FROM notes ';
+    List<dynamic> args = [];
+
+    if (tagId != null) {
+      sql += 'INNER JOIN note_tags ON notes.id = note_tags.noteId ';
+    }
+
+    sql += 'WHERE 1=1 ';
+
+    if (query.isNotEmpty) {
+      sql += 'AND (notes.title LIKE ? OR notes.plainTextContent LIKE ?) ';
+      args.addAll(['%$query%', '%$query%']);
+    }
+
+    if (notebookId != null) {
+      sql += 'AND notes.notebookId = ? ';
+      args.add(notebookId);
+    }
+
+    if (tagId != null) {
+      sql += 'AND note_tags.tagId = ? ';
+      args.add(tagId);
+    }
+
+    sql += 'ORDER BY notes.updatedAt DESC';
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery(sql, args);
     return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
   }
 
