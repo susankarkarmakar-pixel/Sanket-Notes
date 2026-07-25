@@ -13,10 +13,10 @@ class NoteEditorScreen extends StatefulWidget {
   const NoteEditorScreen({Key? key, this.note, this.notebookId}) : super(key: key);
 
   @override
-  _NoteEditorScreenState createState() => _NoteEditorScreenState();
+  NoteEditorScreenState createState() => NoteEditorScreenState();
 }
 
-class _NoteEditorScreenState extends State<NoteEditorScreen> {
+class NoteEditorScreenState extends State<NoteEditorScreen> {
   final DatabaseService _dbService = DatabaseService();
   late TextEditingController _titleController;
   late quill.QuillController _quillController;
@@ -129,9 +129,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         }
     }
 
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 
   Future<void> _deleteNote() async {

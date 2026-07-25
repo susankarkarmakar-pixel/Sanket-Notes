@@ -6,10 +6,10 @@ class TagManagerScreen extends StatefulWidget {
   const TagManagerScreen({Key? key}) : super(key: key);
 
   @override
-  _TagManagerScreenState createState() => _TagManagerScreenState();
+  TagManagerScreenState createState() => TagManagerScreenState();
 }
 
-class _TagManagerScreenState extends State<TagManagerScreen> {
+class TagManagerScreenState extends State<TagManagerScreen> {
   final DatabaseService _dbService = DatabaseService();
   List<Tag> _tags = [];
   bool _isLoading = true;
@@ -48,6 +48,7 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
             onPressed: () async {
               if (controller.text.isNotEmpty) {
                 await _dbService.insertTag(Tag(name: controller.text));
+                if (!mounted) return;
                 Navigator.pop(context);
                 _loadTags();
               }
