@@ -5,6 +5,7 @@ import '../models/notebook.dart';
 import '../services/database_service.dart';
 import 'note_editor_screen.dart';
 import 'tag_manager_screen.dart';
+import 'notebook_manager_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -144,9 +145,26 @@ class _HomeScreenState extends State<HomeScreen> {
             const Divider(),
             ListTile(
               title: const Text('Notebooks', style: TextStyle(fontWeight: FontWeight.bold)),
-              trailing: IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: _createNotebook,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.settings, size: 20),
+                    tooltip: 'Manage Notebooks',
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NotebookManagerScreen()),
+                      ).then((_) => _loadData());
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add, size: 20),
+                    tooltip: 'Add Notebook',
+                    onPressed: _createNotebook,
+                  ),
+                ],
               ),
             ),
             ..._notebooks.map((notebook) => ListTile(

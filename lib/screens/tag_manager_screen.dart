@@ -22,9 +22,7 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
 
   Future<void> _loadTags() async {
     setState(() => _isLoading = true);
-    final db = await _dbService.database;
-    final List<Map<String, dynamic>> maps = await db.query('tags');
-    final tags = List.generate(maps.length, (i) => Tag.fromMap(maps[i]));
+    final tags = await _dbService.getTags();
     setState(() {
       _tags = tags;
       _isLoading = false;
@@ -49,8 +47,7 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
           TextButton(
             onPressed: () async {
               if (controller.text.isNotEmpty) {
-                final db = await _dbService.database;
-                await db.insert('tags', Tag(name: controller.text).toMap());
+                await _dbService.insertTag(Tag(name: controller.text));
                 Navigator.pop(context);
                 _loadTags();
               }
@@ -62,10 +59,30 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
     );
   }
 
-  Future<void> _deleteTag(int id) async {
-    final db = await _dbService.database;
-    await db.delete('tags', where: 'id = ?', whereArgs: [id]);
-    _loadTags();
+  Future<void> _deleteTag(Tag tag) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Tag?'),
+        content: Text('Are you sure you want to delete "${tag.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && tag.id != null) {
+      await _dbService.deleteTag(tag.id!);
+      _loadTags();
+    }
   }
 
   @override
@@ -86,7 +103,7 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
                       title: Text(tag.name),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete),
-                        onPressed: () => _deleteTag(tag.id!),
+                        onPressed: () => _deleteTag(tag),
                       ),
                     );
                   },

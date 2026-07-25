@@ -24,6 +24,9 @@ class DatabaseService {
     return await openDatabase(
       path,
       version: 1,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON;');
+      },
       onCreate: _createDb,
     );
   }
@@ -119,5 +122,59 @@ class DatabaseService {
   Future<int> deleteNotebook(int id) async {
     final db = await database;
     return await db.delete('notebooks', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Tags CRUD ---
+  Future<int> insertTag(Tag tag) async {
+    final db = await database;
+    return await db.insert('tags', tag.toMap());
+  }
+
+  Future<List<Tag>> getTags() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('tags');
+    return List.generate(maps.length, (i) => Tag.fromMap(maps[i]));
+  }
+
+  Future<int> updateTag(Tag tag) async {
+    final db = await database;
+    return await db.update('tags', tag.toMap(), where: 'id = ?', whereArgs: [tag.id]);
+  }
+
+  Future<int> deleteTag(int id) async {
+    final db = await database;
+    return await db.delete('tags', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Note-Tag Relationship ---
+  Future<void> assignTagToNote(int noteId, int tagId) async {
+    final db = await database;
+    await db.insert('note_tags', {'noteId': noteId, 'tagId': tagId}, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  Future<void> removeTagFromNote(int noteId, int tagId) async {
+    final db = await database;
+    await db.delete('note_tags', where: 'noteId = ? AND tagId = ?', whereArgs: [noteId, tagId]);
+  }
+
+  Future<List<Tag>> getTagsForNote(int noteId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT tags.* FROM tags
+      INNER JOIN note_tags ON tags.id = note_tags.tagId
+      WHERE note_tags.noteId = ?
+    ''', [noteId]);
+    return List.generate(maps.length, (i) => Tag.fromMap(maps[i]));
+  }
+
+  Future<List<Note>> getNotesForTag(int tagId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT notes.* FROM notes
+      INNER JOIN note_tags ON notes.id = note_tags.noteId
+      WHERE note_tags.tagId = ?
+      ORDER BY notes.updatedAt DESC
+    ''', [tagId]);
+    return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
   }
 }
