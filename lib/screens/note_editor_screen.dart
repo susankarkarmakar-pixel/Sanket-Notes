@@ -100,6 +100,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       id: widget.note?.id,
       title: title,
       content: content,
+      plainTextContent: plainTextContent,
       createdAt: widget.note?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       notebookId: _selectedNotebookId,

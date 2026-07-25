@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/note.dart';
 import '../models/notebook.dart';
+import '../models/tag.dart';
 import '../services/database_service.dart';
 import 'note_editor_screen.dart';
 import 'tag_manager_screen.dart';
@@ -18,8 +19,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _dbService = DatabaseService();
   List<Note> _notes = [];
   List<Notebook> _notebooks = [];
+  List<Tag> _tags = [];
+  Map<int, List<Tag>> _noteTagsMap = {};
+
   bool _isLoading = true;
+  bool _isSearching = false;
+
   int? _selectedNotebookId;
+  int? _selectedTagId;
+  String _searchQuery = '';
+
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -27,20 +37,36 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final notebooks = await _dbService.getNotebooks();
 
-    List<Note> notes;
-    if (_selectedNotebookId == null) {
-      notes = await _dbService.getNotes();
-    } else {
-      notes = await _dbService.getNotesByNotebook(_selectedNotebookId!);
+    final notebooks = await _dbService.getNotebooks();
+    final tags = await _dbService.getTags();
+
+    final notes = await _dbService.searchNotes(
+      _searchQuery,
+      notebookId: _selectedNotebookId,
+      tagId: _selectedTagId,
+    );
+
+    final Map<int, List<Tag>> noteTagsMap = {};
+    for (var note in notes) {
+        if (note.id != null) {
+            noteTagsMap[note.id!] = await _dbService.getTagsForNote(note.id!);
+        }
     }
 
     setState(() {
       _notebooks = notebooks;
+      _tags = tags;
       _notes = notes;
+      _noteTagsMap = noteTagsMap;
       _isLoading = false;
     });
   }
@@ -75,31 +101,60 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _getPlainText(String content) {
-    try {
-      final doc = jsonDecode(content);
-      // Quick way to extract text from quill delta JSON without initializing a controller
-      String text = '';
-      for (var item in doc) {
-        if (item['insert'] is String) {
-          text += item['insert'];
-        }
-      }
-      return text;
-    } catch (e) {
-      return content;
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else {
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     }
+  }
+
+  String _getPreviewText(Note note) {
+    String text = note.plainTextContent.replaceAll('\n', ' ').trim();
+    if (text.length > 100) {
+      return '${text.substring(0, 100)}...';
+    }
+    return text.isEmpty ? 'No additional text' : text;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sanket Notes'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Search notes...',
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                  _loadData();
+                },
+              )
+            : const Text('Sanket Notes'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {}, // TODO: Search functionality
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                  _loadData();
+                }
+              });
+            },
           ),
         ],
       ),
@@ -122,14 +177,16 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.note),
               title: const Text('All Notes'),
-              selected: _selectedNotebookId == null,
+              selected: _selectedNotebookId == null && _selectedTagId == null,
               onTap: () {
-                setState(() => _selectedNotebookId = null);
+                setState(() {
+                  _selectedNotebookId = null;
+                  _selectedTagId = null;
+                });
                 Navigator.pop(context);
                 _loadData();
               },
             ),
-            const Divider(),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.label),
@@ -139,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const TagManagerScreen()),
-                );
+                ).then((_) => _loadData());
               },
             ),
             const Divider(),
@@ -172,7 +229,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: Text(notebook.name),
                   selected: _selectedNotebookId == notebook.id,
                   onTap: () {
-                    setState(() => _selectedNotebookId = notebook.id);
+                    setState(() {
+                      _selectedNotebookId = notebook.id;
+                      // Allow selecting both notebook and tag
+                    });
+                    Navigator.pop(context);
+                    _loadData();
+                  },
+                )),
+            const Divider(),
+            const ListTile(
+              title: Text('Tags', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ..._tags.map((tag) => ListTile(
+                  leading: const Icon(Icons.tag, size: 16),
+                  title: Text(tag.name),
+                  selected: _selectedTagId == tag.id,
+                  onTap: () {
+                    setState(() {
+                      _selectedTagId = tag.id;
+                      // Allow selecting both notebook and tag
+                    });
                     Navigator.pop(context);
                     _loadData();
                   },
@@ -183,27 +260,84 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _notes.isEmpty
-              ? const Center(child: Text('No notes yet. Create one!'))
+              ? Center(
+                  child: Text(
+                    _searchQuery.isNotEmpty || _selectedNotebookId != null || _selectedTagId != null
+                        ? 'No notes match your filters.'
+                        : 'No notes yet. Create one!',
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                )
               : ListView.builder(
                   itemCount: _notes.length,
                   itemBuilder: (context, index) {
                     final note = _notes[index];
-                    return ListTile(
-                      title: Text(note.title.isNotEmpty ? note.title : 'Untitled Note'),
-                      subtitle: Text(
-                        _getPlainText(note.content),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                    final noteTags = _noteTagsMap[note.id] ?? [];
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(12.0),
+                        title: Text(
+                          note.title.isNotEmpty ? note.title : 'Untitled Note',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              _getPreviewText(note),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 12,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  _formatDate(note.updatedAt),
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                                if (note.notebookId != null)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.book, size: 12, color: Colors.grey),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _notebooks.firstWhere((n) => n.id == note.notebookId, orElse: () => Notebook(id: 0, name: 'Unknown')).name,
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                if (noteTags.isNotEmpty)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.label, size: 12, color: Colors.grey),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        noteTags.map((t) => t.name).join(', '),
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => NoteEditorScreen(note: note),
+                            ),
+                          );
+                          _loadData();
+                        },
                       ),
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => NoteEditorScreen(note: note),
-                          ),
-                        );
-                        _loadData();
-                      },
                     );
                   },
                 ),
