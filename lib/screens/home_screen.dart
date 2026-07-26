@@ -194,6 +194,7 @@ class HomeScreenState extends State<HomeScreen> {
               leading: const Icon(Icons.label),
               title: const Text('Manage Tags'),
               onTap: () {
+                if (!mounted) return;
                 Navigator.pop(context);
                 Navigator.push(
                   context,
@@ -211,6 +212,7 @@ class HomeScreenState extends State<HomeScreen> {
                     icon: const Icon(Icons.settings, size: 20),
                     tooltip: 'Manage Notebooks',
                     onPressed: () {
+                      if (!mounted) return;
                       Navigator.pop(context);
                       Navigator.push(
                         context,
